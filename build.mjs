@@ -62,20 +62,13 @@ js = replaceOnce(js,
                 this.annotations = new Annotations(global, this.cameraFrame != null);
             }
             this.inputController = new InputController(global);`,
-    `            console.info('[onModelReady] settings.annotations:', (global.settings.annotations || []).length, 'settings.labels:', (global.settings.labels || []).length);
-            if (!this.annotations && !config.noui) {
-                try {
-                    this.annotations = new Annotations(global, this.cameraFrame != null);
-                    console.info('[onModelReady] Annotations constructed OK,', (global.settings.annotations || []).length, 'entries');
-                }
-                catch (err) {
-                    console.error('[onModelReady] Annotations constructor threw:', err);
-                }
+    `            if (!this.annotations && !config.noui) {
+                this.annotations = new Annotations(global, this.cameraFrame != null);
             }
             if (!this.inputController) {
                 this.inputController = new InputController(global);
             }`,
-    'idempotent controllers + annotations diagnostics');
+    'idempotent controllers');
 
 js = replaceOnce(js,
     `                };
@@ -153,7 +146,6 @@ js = replaceOnce(js,
         // transition timer.
         this.loadAnimTrack = (track) => {
             controllers.anim = new AnimController(track);
-            this.currentAnimTrack = track;
             state.hasAnimation = true;
             state.animationDuration = controllers.anim.animState.cursor.duration;
             state.animationPaused = false;
@@ -177,15 +169,9 @@ const bundle = js
     + stripTrailingExport(read('label-tool.js'), 'export { initLabelTool };', 'label-tool.js')
     + '\n'
     + stripTrailingExport(read('read-json-tool.js'), 'export { initReadJsonTool };', 'read-json-tool.js')
-    + '\n'
-    + stripTrailingExport(read('annotation-tool.js'), 'export { initAnnotationTool };', 'annotation-tool.js')
-    + '\n'
-    + stripTrailingExport(read('export-tool.js'), 'export { initExportTool };', 'export-tool.js')
     + '\nwindow.__lfsInitMeasureTool = initMeasureTool;\n'
     + 'window.__lfsInitLabelTool = initLabelTool;\n'
-    + 'window.__lfsInitReadJsonTool = initReadJsonTool;\n'
-    + 'window.__lfsInitAnnotationTool = initAnnotationTool;\n'
-    + 'window.__lfsInitExportTool = initExportTool;\n})();\n';
+    + 'window.__lfsInitReadJsonTool = initReadJsonTool;\n})();\n';
 
 let html = read('template.html');
 
@@ -206,25 +192,8 @@ html = replaceOnce(html,
 
 html = replaceOnce(html,
     'settings: fetch(settingsUrl).then(response => response.json())',
-    'settings: {"camera":{"fov":50,"position":[5,5,5],"target":[0,0,0],"startAnim":"none"},"background":{"color":[0,0,0]},"animTracks":[],"annotations":[]}',
+    'settings: {"camera":{"fov":50,"position":[5,5,5],"target":[0,0,0],"startAnim":"none"},"background":{"color":[0,0,0]},"animTracks":[]}',
     'inline settings');
-
-// Embed a base64 copy of this fully-built, pristine index.html into itself
-// (as a non-executable data tag, same reasoning as the model-data tag: raw
-// HTML text is full of literal </script sequences from its own closing
-// tags, so it must be base64'd, not embedded verbatim). export-tool.js uses
-// this as its base for splicing a new export, rather than fetch()ing this
-// page's own URL (often blocked by browsers under file://) or cloning the
-// live DOM (which by export time has accumulated runtime-injected elements
-// - pc-app's own canvas, tool panels, hotspot markers, etc. - that would
-// get baked in as if they were static authored markup; a custom element
-// re-initializing against unexpected pre-existing children on the next
-// fresh load is a very plausible way to end up with a silent white screen).
-const pristineBase64 = Buffer.from(html, 'utf8').toString('base64');
-html = replaceOnce(html,
-    '</body>\n</html>',
-    `<script type="text/plain" id="lfsPristineHtml">${pristineBase64}</script>\n</body>\n</html>`,
-    'embed pristine html copy');
 
 const out = path.join(root, 'index.html');
 writeFileSync(out, html);
